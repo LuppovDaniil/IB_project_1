@@ -76,9 +76,54 @@ apt-get install samtools
 samtools view -S -b alignment.sam > alignment.bam
 samtools flagstat alignment.bam
 ```
+
 The last command gave us statistics. 891649 reads were mapped.
 
+Then we needed to sort and index our bam file. For this step we used the next commands:
+
+```bash
+samtools sort alignment.bam alignment_sorted
+samtools index alignment_sorted.bam
+```
+
+Then we looked at the results in [IGV browser](https://software.broadinstitute.org/software/igv/). So, all reads were displayed in their correct positions. Pictures are shown in our lab report. The next task was to find SNPs in those reads.
 
 *10/23/2022*
 
+Then we created the special mpileup file, which contains the number of bases that match or don’t match the reference.
+
+```bash
+samtools mpileup -f reference fasta file alignment_sorted.bam >  my.mpileup
+```
+
+Then, we used [VarScan](http://dkoboldt.github.io/varscan/) in order to call actual variants13. The next command we runned allowed us to find SNPs. We set the minimum of non-reference bases at a position required to call it a mutation in the sample (50%). Also we used the `--variants` flag, which allows to  output positions that are above our threshold, and `--output-vcf 1` option, which allows to output in a variant call format.
+
+```bash
+java -jar VarScan.v2.4.0.jar  mpileup2snp my.mpileup --min-var-freq 0.5 --variants --output-vcf 1 > VarScan_results_0.5.vcf
+```
+
+After that we visualized the received file in the IGV browser again and there found the short description of found SNPs (we found 6 SNPs, all are menteioned in our lab report).
+
 *10/26/2022*
+
+Finally, we used [SnpEff](http://pcingola.github.io/SnpEff/) to avoid mistakes from the previous step. For this we needed to create a database with both the reference and the annotation. The data for the database was taken from [here](https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/005/845/GCF_000005845.2_ASM584v2/GCF_000005845.2_ASM584v2_genomic.gbff.gz). Also we needed to create the special configuration file: created empty text file snpEff.config, and added there just one string: "k12.genome : ecoli_K12". Then we created folder for the database and renamed gotten data.
+
+```bash
+mkdir -p data/k12
+gunzip GCF_000005845.2_ASM584v2_genomic.gbff.gz
+cp GCF_000005845.2_ASM584v2_genomic.gbff data/k12/genes.gbk
+```
+
+Both the configuration file and *k12* folder you can find in the folder *snpeff_required/*. Then we needed to create the database. This step was really difficult for us, but we found the solution in replacing the configuration file from SnpEff data folder to new one and placing there the folder *data/k12/*. Then the next command ran without errors.
+
+```bash
+java -jar snpEff.jar build -genbank -v k12
+```
+
+After that we annotated the result file received from VarScan:
+
+```bash
+snpEff ann k12 VarScan_results_0.5.vcf > VarScan_results_annotated.vcf
+```
+
+In the end, we received the file with all SNPs being described in a correct way. Certainly, we looked at them in IGV browser. All results are described in our lab report and are placed in the folder *results/*
